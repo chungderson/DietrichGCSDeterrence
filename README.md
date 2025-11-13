@@ -1,10 +1,10 @@
 # DietrichGCS Deterrence Modeling
 
-A text-based simulation demonstrating the concept of deterrence through a bargaining model where countries can choose to attack or bargain with each other.
+A text-based simulation demonstrating the concept of deterrence through a bargaining model where countries can choose to attack or bargain with each other. Built for the 66-146 Dietrich Grand Challenge Seminar on Complex Social Systems
 
 ## Overview
 
-This simulation models international relations through a game-theoretic framework where countries interact in a round-robin format. Each country makes strategic decisions based on expected value calculations, choosing between peaceful bargaining and aggressive attacks.
+This simulation models international relations through a game-theoretic framework where countries interact in a round-robin format. Each country makes strategic decisions based on expected value calculations, choosing between peaceful bargaining and strategic attacks.
 
 ## Model Details
 
