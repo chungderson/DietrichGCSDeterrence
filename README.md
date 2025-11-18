@@ -1,6 +1,6 @@
 # DietrichGCS Deterrence Modeling
 
-A text-based simulation demonstrating the concept of deterrence through a bargaining model where countries can choose to attack or bargain with each other. Built for the 66-146 Dietrich Grand Challenge Seminar on Complex Social Systems
+A text-based simulation demonstrating the concept of deterrence through a bargaining model where countries can choose to attack or bargain with each other. Built for the 66-146 Dietrich Grand Challenge Seminar on Complex Social Systems. Developed with the assistance of Claude and Cursor.
 
 ## Overview
 
@@ -9,7 +9,7 @@ This simulation models international relations through a game-theoretic framewor
 ## Model Details
 
 ### Initial Setup
-- **10 countries** participate in the simulation (configurable via `NUM_COUNTRIES`)
+- **100 countries** participate in the simulation (configurable via `NUM_COUNTRIES`)
 - Each country starts with a **random private value between 10 and 10000** (configurable via `INITIAL_VALUE_MIN` and `INITIAL_VALUE_MAX`)
 - Each country has **perceived values** for all other countries (within 15% of the true private value, configurable via `PERCEIVED_VALUE_ACCURACY`)
 - At the start of each round, each active country grows by a **random amount between 1% and 8%** (configurable via `GROWTH_RATE_MIN` and `GROWTH_RATE_MAX`)
@@ -28,22 +28,18 @@ Countries use **expected value calculations** to decide whether to attack:
 - This creates a balanced mix of attacks and bargains based on economic rationality
 
 #### Attack Mechanics
-- **Perceived odds of winning**: Within 15% of true odds (based on relative strength)
-  - True odds = attacker_private_value / (attacker_private_value + defender_private_value)
-  - Perceived odds are randomly generated within 15% of true odds
-- **Cost of attack**: 50% of the **total value after acquisition** (attacker + defender)
-  - First, attacker gains defender's value
-  - Then, cost is calculated as 50% of the total (attacker + defender)
-  - This makes attacks expensive, especially for larger countries
-- **Smaller country cap**: Smaller countries cannot gain more than **2x their value** (no total takeover)
-  - If a smaller country wins, their gain is capped at doubling their value
-- **If attack succeeds**:
-  - Defender's value goes to 0
-  - Attacker gains the defender's value (capped if attacker is smaller)
-  - Then the attack cost (50% of total) is deducted
-  - Defender is removed from the game
-- **If defense succeeds**:
-  - Both countries lose 10% of their value (configurable via `DEFENSE_LOSS_PERCENTAGE`)
+
+**Win Probability**: Based on relative strength (attacker_value / total_value), perceived with ±15% accuracy
+
+- **Success cost**: Base 15% of total value, discounted if attacker is much larger (up to 50% discount for overwhelming strength)
+- **If attack fails**: Pay 50% of attacker's initial value + lose 10% of value = 60% total loss
+- **Perceived costs**: Countries estimate costs with ±15% accuracy (creates decision uncertainty)
+
+**Attack Outcomes**:
+- **Success**: Attacker gains defender's value (capped at 2× attacker's value), pays 15% cost, defender eliminated
+- **Failure**: Attacker loses 60% of value (50% cost + 10% defense loss), defender loses only 5% of value
+
+**Protection Rule**: Smaller countries cannot gain more than 2× their value (prevents total takeover)
 
 #### Bargain Mechanics
 - Total surplus of **20%** is randomly split between the two countries (configurable via `BARGAIN_SURPLUS_PERCENTAGE`)
@@ -59,7 +55,7 @@ After each interaction, all other countries' perceived values of the interacting
 
 The simulation runs **one complete round** in round-robin format:
 - Each country interacts with every other active country exactly once
-- Total of 45 interactions for 10 countries (n × (n-1) / 2)
+- Total interactions = n × (n-1) / 2 where n is the number of active countries
 - At the start of the round, all active countries grow by 1-8% (random growth rate per country)
 
 ### Statistics Tracked
@@ -91,9 +87,13 @@ GROWTH_RATE_MIN = 0.01  # 1% minimum growth per round
 GROWTH_RATE_MAX = 0.08  # 8% maximum growth per round
 
 # Attack Mechanics
-ATTACK_COST_PERCENTAGE = 0.50  # 50% of total value after acquisition
-DEFENSE_LOSS_PERCENTAGE = 0.10  # 10% loss if defense succeeds
-MAX_GAIN_MULTIPLIER = 2.0  # Smaller countries can't gain more than 2x their value
+ATTACK_COST_PERCENTAGE = 0.15  # Base success cost before discounts
+FAILED_ATTACK_COST_PERCENTAGE = 0.50  # Cost if attack fails: 50% of attacker's value
+ATTACK_SUCCESS_DISCOUNT_CAP = 0.50  # Successful attack cost discount cap
+ATTACKER_DEFENSE_LOSS_PERCENTAGE = 0.10  # Attacker loss when defense succeeds
+DEFENDER_DEFENSE_LOSS_PERCENTAGE = 0.05  # Defender loss when defense succeeds
+MAX_GAIN_MULTIPLIER = 2.0  # Smaller countries capped at 2× their value
+PERCEIVED_COST_ACCURACY = 0.15  # Perceived costs ±15% of true costs
 
 # Bargain Mechanics
 BARGAIN_SURPLUS_PERCENTAGE = 0.20  # 20% total surplus (0-20% split)
@@ -131,6 +131,44 @@ You can adjust the number of runs by modifying `NUM_RUNS` in `analyze_simulation
 - **Interaction Statistics**: Total interactions, bargains, attacks (successful/failed)
 - **Aggregate Attack Statistics**: Attempted, won, lost, defended across all countries
 - **Attack Success Rate**: Percentage of successful attacks
+
+### Running Visualizations
+
+```bash
+python visualize_deterrence.py
+```
+
+This creates comprehensive visualizations of deterrence dynamics (nuclear weapons are not yet modeled—those will be layered on later). The visualization script:
+
+- Runs a simulation (default: 1 round, matching main simulation)
+- Generates 7 visualizations that highlight how bargaining and deterrence prevent costly wars
+- Saves all plots to the `visualizations/` directory
+
+**Command-line options:**
+```bash
+# Default: 1 round (matches main simulation)
+python visualize_deterrence.py
+
+# Run multiple rounds to see trends
+python visualize_deterrence.py --rounds 5
+
+# Custom seed and output directory
+python visualize_deterrence.py --rounds 10 --seed 123 --output-dir my_plots
+
+# See all options
+python visualize_deterrence.py --help
+```
+
+**Visualizations Generated:**
+1. **Attack Rate vs Bargain Rate** - Shows deterrence effectiveness over time
+1b. **Value Saved by Bargains** - Estimates value preserved because countries chose to bargain instead of fight
+2. **Perceived vs Actual EV** - Shows how misperception affects decisions
+3. **Country Survival** - Tracks system stability
+4. **Total Value Over Time** - Shows value preservation
+5. **Attack Success Rate** - Shows defense effectiveness
+6. **EV Comparison** - Shows why countries choose attack vs bargain
+
+See `VISUALIZATION_GUIDE.md` for detailed explanations of each visualization and how to interpret them.
 
 ### Output
 
@@ -221,8 +259,26 @@ Countries at end of round: 5
 
 ## Requirements
 
+### Core Simulation
 - Python 3.7+
 - No external dependencies (uses only standard library)
+
+### Visualization Script
+The visualization script requires additional packages. Install them with:
+
+```bash
+pip install -r requirements.txt
+```
+
+Or install individually:
+```bash
+pip install matplotlib seaborn numpy
+```
+
+**Required packages for visualization:**
+- `matplotlib>=3.5.0` - For creating plots
+- `seaborn>=0.12.0` - For enhanced styling
+- `numpy>=1.21.0` - For numerical operations
 
 ## How It Works
 
@@ -250,15 +306,21 @@ Countries at end of round: 5
 
 - **Expected Value Decision Making**: Countries attack when perceived EV of attack > perceived EV of bargain
 - **Imperfect Information**: Countries have perceived values and odds that may differ from reality (within 15%)
-- **Costly Wars**: Attack cost is 50% of total value after acquisition, making wars expensive
+- **Asymmetric Attack Costs**: 
+  - Success: 15% of total value, discounted when attacker is much larger
+  - Failure: 60% of attacker's value (50% cost + 10% defense loss), defender loses only 5%
+- **Perceived Costs**: Countries estimate costs with ±15% accuracy (creates decision uncertainty)
 - **Size Advantage**: Bigger countries have much higher actual EV when attacking smaller ones
 - **Smaller Country Protection**: Smaller countries are capped at 2x their value (no total takeover)
 - **Random Growth**: Each country grows by a random amount (1-8%) each round
 - **Comprehensive Statistics**: Detailed tracking of all interactions, outcomes, and country survival
 - **Configurable Parameters**: All key parameters are easily adjustable at the top of the file
 - **Statistical Analysis Tool**: Run multiple simulations and get statistical means, distributions, and success rates
+- **Visualization Suite**: Comprehensive visualizations to understand deterrence dynamics
 
-## Analysis Tool
+## Analysis Tools
+
+### Statistical Analysis
 
 The `analyze_simulation.py` script provides statistical analysis by running the simulation multiple times and aggregating results. This is useful for:
 
@@ -266,6 +328,18 @@ The `analyze_simulation.py` script provides statistical analysis by running the 
 - Identifying patterns and distributions
 - Testing how parameter changes affect overall behavior
 - Getting reliable statistics on attack success rates, country survival, value changes, etc.
+
+### Visualization
+
+The `visualize_deterrence.py` script creates comprehensive visualizations to understand deterrence dynamics. This is useful for:
+
+- Visualizing deterrence effectiveness over time
+- Understanding how perception vs reality affects decisions
+- Tracking system stability and value preservation
+- Identifying patterns in attack vs bargain choices
+- Comparing expected values across different scenarios
+
+See `VISUALIZATION_GUIDE.md` for detailed explanations of each visualization and interpretation guidelines.
 
 **Example Analysis Output:**
 ```
@@ -297,3 +371,30 @@ Successful Attacks:
 
 Attack Success Rate: 16.26%
 ```
+
+## Files
+
+- **`deterrence_simulation.py`** - Main simulation code
+- **`analyze_simulation.py`** - Statistical analysis tool (runs multiple simulations)
+- **`visualize_deterrence.py`** - Visualization tool (creates plots and charts)
+- **`requirements.txt`** - Python package dependencies for visualization
+- **`VISUALIZATION_GUIDE.md`** - Detailed guide to understanding the visualizations
+- **`README.md`** - This file
+
+## Recent Updates
+
+### Attack Cost Mechanics (Latest)
+- **Success cost**: 15% of total value (reduced from 20%)
+- **Failure cost**: 60% of attacker's value (50% cost + 10% defense loss)
+- **Perceived costs**: ±15% accuracy for cost estimates (creates uncertainty)
+- **True vs Perceived EV**: Calculations properly account for perceived vs actual costs
+
+### Visualization Suite (New)
+- Added comprehensive visualization script with 6 different plot types
+- Created visualization guide with interpretation instructions
+- Added command-line interface for flexible configuration
+- Supports multiple rounds for trend analysis
+
+### Dependencies
+- Added `requirements.txt` for easy package installation
+- Visualization script handles missing dependencies gracefully
