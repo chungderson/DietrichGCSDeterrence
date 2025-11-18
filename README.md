@@ -37,7 +37,7 @@ Countries use **expected value calculations** to decide whether to attack:
 
 **Attack Outcomes**:
 - **Success**: Attacker gains defender's value (capped at 2× attacker's value), pays 15% cost, defender eliminated
-- **Failure**: Attacker loses 60% of value (50% cost + 10% defense loss), defender loses only 5% of value
+- **Failure**: Attacker loses 50% of value (failed cost only), defender loses only 5% of value
 
 **Protection Rule**: Smaller countries cannot gain more than 2× their value (prevents total takeover)
 
@@ -317,7 +317,7 @@ pip install matplotlib seaborn numpy
 - **Imperfect Information**: Countries have perceived values and odds that may differ from reality (within 15%)
 - **Asymmetric Attack Costs**: 
   - Success: 15% of total value, discounted when attacker is much larger
-  - Failure: 60% of attacker's value (50% cost + 10% defense loss), defender loses only 5%
+  - Failure: 50% of attacker's value (failed cost only), defender loses only 5%
 - **Perceived Costs**: Countries estimate costs with ±15% accuracy (creates decision uncertainty)
 - **Size Advantage**: Bigger countries have much higher actual EV when attacking smaller ones
 - **Smaller Country Protection**: Smaller countries are capped at 2x their value (no total takeover)
@@ -393,8 +393,8 @@ Attack Success Rate: 16.26%
 ## Recent Updates
 
 ### Attack Cost Mechanics (Latest)
-- **Success cost**: 15% of total value (reduced from 20%)
-- **Failure cost**: 60% of attacker's value (50% cost + 10% defense loss)
+- **Success cost**: 15% of total value (discounted up to 50% when attacker is much larger)
+- **Failure cost**: 50% of attacker's value (defender loses 5%)
 - **Perceived costs**: ±15% accuracy for cost estimates (creates uncertainty)
 - **True vs Perceived EV**: Calculations properly account for perceived vs actual costs
 

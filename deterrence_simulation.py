@@ -29,7 +29,6 @@ GROWTH_RATE_MAX = 0.08  # 8% maximum growth per round
 ATTACK_COST_PERCENTAGE = 0.15  # Base cost (before discounts) as % of total value after acquisition
 FAILED_ATTACK_COST_PERCENTAGE = 0.50  # Cost is 50% of attacker's value if attack fails
 ATTACK_SUCCESS_DISCOUNT_CAP = 0.50  # Successful attack costs can be discounted up to 50% when attacker >> defender
-ATTACKER_DEFENSE_LOSS_PERCENTAGE = 0.10  # Attacker loses 10% of value when defense succeeds
 DEFENDER_DEFENSE_LOSS_PERCENTAGE = 0.05  # Defender loses 5% of value when defense succeeds
 MAX_GAIN_MULTIPLIER = 2.0  # Smaller countries can't gain more than doubling their value (no total takeover)
 PERCEIVED_COST_ACCURACY = 0.15  # Perceived costs are within 15% of true costs (0.85-1.15)
@@ -174,9 +173,9 @@ class Country:
         final_value_if_win = total_after_acquisition - perceived_cost_of_total
         expected_gain_if_win = final_value_if_win - self.private_value  # Net gain
         
-        # If defense succeeds: attacker loses ATTACKER_DEFENSE_LOSS_PERCENTAGE and incurs failed attack cost
+        # If defense succeeds: attacker only pays failed attack cost (no extra percentage loss)
         perceived_failure_cost = self.get_perceived_failed_attack_cost()
-        final_value_if_lose = max(self.private_value * (1.0 - ATTACKER_DEFENSE_LOSS_PERCENTAGE) - perceived_failure_cost, 0.0)
+        final_value_if_lose = max(self.private_value - perceived_failure_cost, 0.0)
         expected_loss_if_lose = self.private_value - final_value_if_lose
         ev_attack = (odds * expected_gain_if_win) - ((1 - odds) * expected_loss_if_lose)
         
@@ -304,7 +303,6 @@ class DeterrenceSimulation:
             }
         else:
             # Defense successful: attacker loses more value than defender
-            attacker.private_value *= (1.0 - ATTACKER_DEFENSE_LOSS_PERCENTAGE)
             defender.private_value *= (1.0 - DEFENDER_DEFENSE_LOSS_PERCENTAGE)
             
             # Failed attacks incur a cost based on the attacker's initial value
@@ -439,7 +437,7 @@ class DeterrenceSimulation:
             final_value_if_win1 = total_after_acquisition1 - perceived_cost1
             perceived_gain_if_win1 = final_value_if_win1 - country1.private_value  # Net gain
             perceived_failure_cost1 = country1.get_perceived_failed_attack_cost()
-            failure_value_if_lose1 = max(country1.private_value * (1.0 - ATTACKER_DEFENSE_LOSS_PERCENTAGE) - perceived_failure_cost1, 0.0)
+            failure_value_if_lose1 = max(country1.private_value - perceived_failure_cost1, 0.0)
             perceived_loss_if_lose1 = country1.private_value - failure_value_if_lose1
             ev_attack1_perceived = (perceived_odds1 * perceived_gain_if_win1) - ((1 - perceived_odds1) * perceived_loss_if_lose1)
             # Expected value of bargain for country1
@@ -457,7 +455,7 @@ class DeterrenceSimulation:
             multiplier1 = calculate_success_cost_multiplier(country1_initial, country2_initial)
             actual_cost1 = total_after_acquisition1 * ATTACK_COST_PERCENTAGE * multiplier1
             value_if_win1 = total_after_acquisition1 - actual_cost1  # Final value if win (with cap)
-            value_if_lose1 = max(country1_initial * (1.0 - ATTACKER_DEFENSE_LOSS_PERCENTAGE) - (country1_initial * FAILED_ATTACK_COST_PERCENTAGE), 0.0)  # Final value if lose
+            value_if_lose1 = max(country1_initial - (country1_initial * FAILED_ATTACK_COST_PERCENTAGE), 0.0)  # Final value if lose
             expected_final_value1 = (true_odds1 * value_if_win1) + ((1 - true_odds1) * value_if_lose1)
             ev_attack1_actual = expected_final_value1 - country1_initial  # Change from initial value
             
@@ -468,7 +466,7 @@ class DeterrenceSimulation:
             final_value_if_win2 = total_after_acquisition2 - perceived_cost2
             perceived_gain_if_win2 = final_value_if_win2 - country2.private_value  # Net gain
             perceived_failure_cost2 = country2.get_perceived_failed_attack_cost()
-            failure_value_if_lose2 = max(country2.private_value * (1.0 - ATTACKER_DEFENSE_LOSS_PERCENTAGE) - perceived_failure_cost2, 0.0)
+            failure_value_if_lose2 = max(country2.private_value - perceived_failure_cost2, 0.0)
             perceived_loss_if_lose2 = country2.private_value - failure_value_if_lose2
             ev_attack2_perceived = (perceived_odds2 * perceived_gain_if_win2) - ((1 - perceived_odds2) * perceived_loss_if_lose2)
             # Expected value of bargain for country2
@@ -486,7 +484,7 @@ class DeterrenceSimulation:
             multiplier2 = calculate_success_cost_multiplier(country2_initial, country1_initial)
             actual_cost2 = total_after_acquisition2 * ATTACK_COST_PERCENTAGE * multiplier2
             value_if_win2 = total_after_acquisition2 - actual_cost2  # Final value if win (with cap)
-            value_if_lose2 = max(country2_initial * (1.0 - ATTACKER_DEFENSE_LOSS_PERCENTAGE) - (country2_initial * FAILED_ATTACK_COST_PERCENTAGE), 0.0)  # Final value if lose
+            value_if_lose2 = max(country2_initial - (country2_initial * FAILED_ATTACK_COST_PERCENTAGE), 0.0)  # Final value if lose
             expected_final_value2 = (true_odds2 * value_if_win2) + ((1 - true_odds2) * value_if_lose2)
             ev_attack2_actual = expected_final_value2 - country2_initial  # Change from initial value
             
