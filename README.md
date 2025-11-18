@@ -170,6 +170,15 @@ python visualize_deterrence.py --help
 
 See `VISUALIZATION_GUIDE.md` for detailed explanations of each visualization and how to interpret them.
 
+### Interactive Sandbox
+
+![Interactive Deterrence Sandbox](docs/images/sandbox.png)
+
+Launch `interactive_deterrence.ipynb` in Jupyter/VS Code to experiment with:
+- Sliders for attack costs, failed costs, defender/attacker loss, bargaining EV, country count, rounds, and Monte Carlo runs
+- Total wealth + percentage-change plots that update automatically as you release sliders
+- Real-time averages (over configurable MC runs) to explore how parameter tweaks change the balance between deterrence and bargaining
+
 ### Output
 
 The simulation displays:
