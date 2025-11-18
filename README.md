@@ -32,12 +32,12 @@ Countries use **expected value calculations** to decide whether to attack:
 **Win Probability**: Based on relative strength (attacker_value / total_value), perceived with ±15% accuracy
 
 - **Success cost**: Base 15% of total value, discounted if attacker is much larger (up to 50% discount for overwhelming strength)
-- **If attack fails**: Pay 50% of attacker's initial value + lose 10% of value = 60% total loss
+- **Failed cost**: Base 50% of the attacker's value, scaled by the defender's share (attacking a tiny country can halve the penalty; attacking a larger peer can push it up to ~75%)
 - **Perceived costs**: Countries estimate costs with ±15% accuracy (creates decision uncertainty)
 
 **Attack Outcomes**:
 - **Success**: Attacker gains defender's value (capped at 2× attacker's value), pays 15% cost, defender eliminated
-- **Failure**: Attacker loses 50% of value (failed cost only), defender loses only 5% of value
+- **Failure**: Attacker pays the scaled failed-cost penalty, defender still only loses 5% of value
 
 **Protection Rule**: Smaller countries cannot gain more than 2× their value (prevents total takeover)
 
@@ -88,15 +88,14 @@ GROWTH_RATE_MAX = 0.08  # 8% maximum growth per round
 
 # Attack Mechanics
 ATTACK_COST_PERCENTAGE = 0.15  # Base success cost before discounts
-FAILED_ATTACK_COST_PERCENTAGE = 0.50  # Cost if attack fails: 50% of attacker's value
+FAILED_ATTACK_COST_PERCENTAGE = 0.50  # Base failed cost (scaled by defender size)
 ATTACK_SUCCESS_DISCOUNT_CAP = 0.50  # Successful attack cost discount cap
-ATTACKER_DEFENSE_LOSS_PERCENTAGE = 0.10  # Attacker loss when defense succeeds
 DEFENDER_DEFENSE_LOSS_PERCENTAGE = 0.05  # Defender loss when defense succeeds
 MAX_GAIN_MULTIPLIER = 2.0  # Smaller countries capped at 2× their value
 PERCEIVED_COST_ACCURACY = 0.15  # Perceived costs ±15% of true costs
 
 # Bargain Mechanics
-BARGAIN_SURPLUS_PERCENTAGE = 0.20  # 20% total surplus (0-20% split)
+BARGAIN_SURPLUS_PERCENTAGE = 0.30  # 30% total surplus (0-30% split)
 BARGAIN_EV_PERCENTAGE = 0.10  # 10% expected value (average of 0-20%)
 ```
 
@@ -175,7 +174,7 @@ See `VISUALIZATION_GUIDE.md` for detailed explanations of each visualization and
 ![Interactive Deterrence Sandbox](docs/images/sandbox.png)
 
 Launch `interactive_deterrence.ipynb` in Jupyter/VS Code to experiment with:
-- Sliders for attack costs, failed costs, defender/attacker loss, bargaining EV, country count, rounds, and Monte Carlo runs
+- Sliders for attack costs, failed costs (with defender-scaling), defender loss, bargaining EV, country count, rounds, and Monte Carlo runs
 - Total wealth + percentage-change plots that update automatically as you release sliders
 - Real-time averages (over configurable MC runs) to explore how parameter tweaks change the balance between deterrence and bargaining
 
