@@ -31,7 +31,12 @@ FAILED_ATTACK_COST_PERCENTAGE = 0.50  # Base cost (scaled by defender size) when
 ATTACK_SUCCESS_DISCOUNT_CAP = 0.50  # Successful attack costs can be discounted up to 50% when attacker >> defender
 DEFENDER_DEFENSE_LOSS_PERCENTAGE = 0.05  # Defender loses 5% of value when defense succeeds
 MAX_GAIN_MULTIPLIER = 2.0  # Smaller countries can't gain more than doubling their value (no total takeover)
+MIN_VALUE_THRESHOLD = 1.0  # Countries below this value are eliminated
 PERCEIVED_COST_ACCURACY = 0.15  # Perceived costs are within 15% of true costs (0.85-1.15)
+
+# Nuke Mechanics
+NUKE_COST_MULTIPLIER = 3.0  # Cost of attacking a nuke-holding country is 3x normal
+NUKE_PROBABILITY = 0.10  # 10% chance a country starts with a nuke
 
 # Bargain Mechanics
 BARGAIN_SURPLUS_PERCENTAGE = .30  # Total surplus of 30% randomly split between countries (0-30%)
@@ -82,6 +87,7 @@ class Country:
     private_value: float
     perceived_values: Dict[int, float] = field(default_factory=dict)
     is_active: bool = True
+    has_nuke: bool = False
     
     def __post_init__(self):
         """Initialize perceived values for all other countries."""
@@ -142,7 +148,14 @@ class Country:
         perceived_value_of_other = self.perceived_values.get(other_id, 0)
         total_after_acquisition = self.private_value + perceived_value_of_other
         multiplier = calculate_success_cost_multiplier(self.private_value, max(perceived_value_of_other, 0.0))
-        true_cost = total_after_acquisition * ATTACK_COST_PERCENTAGE * multiplier
+        
+        # Apply nuke deterrent if target has a nuke
+        nuke_multiplier = 1.0
+        other_country = all_countries.get(other_id)
+        if other_country and other_country.has_nuke:
+            nuke_multiplier = NUKE_COST_MULTIPLIER
+            
+        true_cost = total_after_acquisition * ATTACK_COST_PERCENTAGE * multiplier * nuke_multiplier
         
         # Perceived cost is within PERCEIVED_COST_ACCURACY of true cost
         min_perceived = true_cost * (1.0 - PERCEIVED_COST_ACCURACY)
@@ -161,7 +174,14 @@ class Country:
         total = self.private_value + perceived_defender_value
         defender_share = perceived_defender_value / total if total > 0 else 0.0
         multiplier = 0.5 + defender_share  # mirrors true failed-cost scaling
-        true_cost = self.private_value * FAILED_ATTACK_COST_PERCENTAGE * multiplier
+        
+        # Apply nuke deterrent if target has a nuke
+        nuke_multiplier = 1.0
+        other_country = all_countries.get(other_id)
+        if other_country and other_country.has_nuke:
+            nuke_multiplier = NUKE_COST_MULTIPLIER
+            
+        true_cost = self.private_value * FAILED_ATTACK_COST_PERCENTAGE * multiplier * nuke_multiplier
         
         # Perceived cost is within PERCEIVED_COST_ACCURACY of true cost
         min_perceived = true_cost * (1.0 - PERCEIVED_COST_ACCURACY)
@@ -254,7 +274,8 @@ class DeterrenceSimulation:
             self.countries[i] = Country(
                 id=i,
                 private_value=private_values[i],
-                perceived_values=perceived_values
+                perceived_values=perceived_values,
+                has_nuke=random.random() < NUKE_PROBABILITY
             )
     
     def _update_perceived_values(self, country1_id: int, country2_id: int):
@@ -302,20 +323,31 @@ class DeterrenceSimulation:
         attack_succeeds = random.random() < attacker_odds
         
         if attack_succeeds:
-            # Attacker wins: defender's value goes to 0, attacker gains that value, then cost is imposed
-            # Cost is ATTACK_COST_PERCENTAGE of the TOTAL value after acquisition, discounted by relative strength
-            # BUT: smaller countries are capped at MAX_GAIN_MULTIPLIER times their value (no total takeover)
+            # Attacker wins: gain is capped at MAX_GAIN_MULTIPLIER times attacker's value
+            # Defender loses exactly what the attacker gains (zero-sum transfer)
+            # Defender is only eliminated if their remaining value falls below MIN_VALUE_THRESHOLD
             max_gain = attacker_initial_value * (MAX_GAIN_MULTIPLIER - 1.0)
-            actual_gain = min(defender_initial_value, max_gain)
-            defender.private_value = 0
+            potential_gain = defender_initial_value  # Could take all of defender's value
+            actual_gain = min(potential_gain, max_gain)
+            
+            # Zero-sum transfer: defender loses exactly what attacker gains
+            defender.private_value = defender_initial_value - actual_gain
             attacker.private_value = attacker_initial_value + actual_gain
+            
             total_value = attacker.private_value  # Total after acquisition
             multiplier = calculate_success_cost_multiplier(attacker_initial_value, defender_initial_value)
-            cost = total_value * ATTACK_COST_PERCENTAGE * multiplier
+            
+            # Apply nuke multiplier if defender had nuke
+            nuke_multiplier = NUKE_COST_MULTIPLIER if defender.has_nuke else 1.0
+            
+            cost = total_value * ATTACK_COST_PERCENTAGE * multiplier * nuke_multiplier
             attacker.private_value = max(attacker.private_value - cost, 0.0)
             
-            # Remove defender from game
-            defender.is_active = False
+            # Check if defender should be eliminated
+            defender_eliminated = defender.private_value < MIN_VALUE_THRESHOLD
+            if defender_eliminated:
+                defender.private_value = 0
+                defender.is_active = False
             
             # Update perceived values for all other countries
             self._update_perceived_values(attacker_id, defender_id)
@@ -324,14 +356,18 @@ class DeterrenceSimulation:
                 "attacker": attacker_id,
                 "defender": defender_id,
                 "attacker_new_value": attacker.private_value,
-                "defender_removed": True
+                "defender_new_value": defender.private_value,
+                "defender_removed": defender_eliminated
             }
         else:
             # Defense successful: attacker loses more value than defender
             defender.private_value *= (1.0 - DEFENDER_DEFENSE_LOSS_PERCENTAGE)
             
             # Failed attacks incur a cost scaled by the defender's size
-            failure_cost = calculate_failed_attack_cost(attacker_initial_value, defender_initial_value)
+            # Apply nuke multiplier if defender has nuke
+            nuke_multiplier = NUKE_COST_MULTIPLIER if defender.has_nuke else 1.0
+            
+            failure_cost = calculate_failed_attack_cost(attacker_initial_value, defender_initial_value) * nuke_multiplier
             attacker.private_value = max(attacker.private_value - failure_cost, 0.0)
             
             # Update perceived values for all other countries
@@ -478,9 +514,13 @@ class DeterrenceSimulation:
             actual_gain_if_win1 = min(country2_initial, max_gain1)  # Capped gain
             total_after_acquisition1 = country1_initial + actual_gain_if_win1  # Total after acquiring defender
             multiplier1 = calculate_success_cost_multiplier(country1_initial, country2_initial)
-            actual_cost1 = total_after_acquisition1 * ATTACK_COST_PERCENTAGE * multiplier1
+            
+            # Apply nuke multiplier to actual costs if defender has nuke
+            nuke_multiplier1 = NUKE_COST_MULTIPLIER if country2.has_nuke else 1.0
+            
+            actual_cost1 = total_after_acquisition1 * ATTACK_COST_PERCENTAGE * multiplier1 * nuke_multiplier1
             value_if_win1 = total_after_acquisition1 - actual_cost1  # Final value if win (with cap)
-            failure_cost1 = calculate_failed_attack_cost(country1_initial, country2_initial)
+            failure_cost1 = calculate_failed_attack_cost(country1_initial, country2_initial) * nuke_multiplier1
             value_if_lose1 = max(country1_initial - failure_cost1, 0.0)  # Final value if lose
             expected_final_value1 = (true_odds1 * value_if_win1) + ((1 - true_odds1) * value_if_lose1)
             ev_attack1_actual = expected_final_value1 - country1_initial  # Change from initial value
@@ -508,9 +548,13 @@ class DeterrenceSimulation:
             actual_gain_if_win2 = min(country1_initial, max_gain2)  # Capped gain
             total_after_acquisition2 = country2_initial + actual_gain_if_win2  # Total after acquiring defender
             multiplier2 = calculate_success_cost_multiplier(country2_initial, country1_initial)
-            actual_cost2 = total_after_acquisition2 * ATTACK_COST_PERCENTAGE * multiplier2
+            
+            # Apply nuke multiplier to actual costs if defender has nuke
+            nuke_multiplier2 = NUKE_COST_MULTIPLIER if country1.has_nuke else 1.0
+            
+            actual_cost2 = total_after_acquisition2 * ATTACK_COST_PERCENTAGE * multiplier2 * nuke_multiplier2
             value_if_win2 = total_after_acquisition2 - actual_cost2  # Final value if win (with cap)
-            failure_cost2 = calculate_failed_attack_cost(country2_initial, country1_initial)
+            failure_cost2 = calculate_failed_attack_cost(country2_initial, country1_initial) * nuke_multiplier2
             value_if_lose2 = max(country2_initial - failure_cost2, 0.0)  # Final value if lose
             expected_final_value2 = (true_odds2 * value_if_win2) + ((1 - true_odds2) * value_if_lose2)
             ev_attack2_actual = expected_final_value2 - country2_initial  # Change from initial value
@@ -700,11 +744,15 @@ class DeterrenceSimulation:
         print(f"\n{'='*60}")
         print(f"Round {status['round']}")
         print(f"{'='*60}")
-        print(f"{'Country':<10} {'Private Value':<15} {'Status':<10} {'Growth Rate':<12} {'Attacks Attempted':<18} {'Attacks Won':<12} {'Attacks Lost':<13} {'Defended':<10} {'Change':<10} {'Change %':<10}")
+        print(f"{'Country':<10} {'Private Value':<15} {'Status':<10} {'N ':<2} {'Growth Rate':<12} {'Attacks Attempted':<18} {'Attacks Won':<12} {'Attacks Lost':<13} {'Defended':<10} {'Change':<10} {'Change %':<10}")
         print(f"{'-'*130}")
         
         for country_id, info in sorted(status['countries'].items()):
             status_str = "Active" if info['is_active'] else "Removed"
+            
+            # Get nuke status
+            country = self.countries[country_id]
+            nuke_str = "☢️" if country.has_nuke else " "
             
             # Get growth rate for this country
             growth_rate = self.country_growth_rates.get(country_id, 0.0)
@@ -726,7 +774,7 @@ class DeterrenceSimulation:
             change_str = f"{change:+.2f}" if previous_value > 0 else "N/A"
             change_pct_str = f"{change_pct:+.2f}%" if previous_value > 0 else "N/A"
             
-            print(f"{country_id:<10} {info['private_value']:<15.2f} {status_str:<10} {growth_str:<12} {attacks_attempted:<18} {attacks_won:<12} {attacks_lost:<13} {defended:<10} {change_str:<10} {change_pct_str:<10}")
+            print(f"{country_id:<10} {info['private_value']:<15.2f} {status_str:<10} {nuke_str:<2} {growth_str:<12} {attacks_attempted:<18} {attacks_won:<12} {attacks_lost:<13} {defended:<10} {change_str:<10} {change_pct_str:<10}")
     
     def print_results(self, results: List[Dict]):
         """Print results from a round."""
